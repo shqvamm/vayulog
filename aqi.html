@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VāyuLog - Real-time Air Quality Monitoring</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="logo.png">
+
+  <!-- Fonts & Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  
+  <!-- Bootstrap + Leaflet -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    :root{
+      --primary:#00d9ff;--danger:#ff3b30;--warning:#ffcc00;--success:#34c759;
+      --glass:rgba(255,255,255,0.08);
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{
+      font-family:'Poppins',sans-serif;
+      background:linear-gradient(45deg,#0f0c29,#302b63,#24243e);
+      background-size:400% 400%;
+      animation:gradient 15s ease infinite;
+      color:#fff;min-height:100vh;
+    }
+    @keyframes gradient{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+    
+    .header{text-align:center;padding:30px 0;}
+    
+    /* Logo Container */
+    .logo-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 5px;
+    }
+
+    /* Logo */
+    .header-logo {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 20px rgba(0, 217, 255, 0.6));
+    }
+
+    @keyframes fadeInFloat {
+      0% {
+        opacity: 0;
+        transform: translateY(-30px) scale(0.8);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .header h1{
+      font-family:'Orbitron',sans-serif;font-size:3.5rem;
+      background:linear-gradient(90deg,#00d9ff,#ff00c8);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+      animation:glow 2s ease-in-out infinite alternate;
+      margin: 0;
+    }
+    @keyframes glow{from{text-shadow:0 0 20px #00d9ff}to{text-shadow:0 0 40px #ff00c8,0 0 60px #00d9ff}}
+
+    .glass{
+      background:var(--glass);backdrop-filter:blur(15px);
+      border-radius:18px;border:1px solid rgba(255,255,255,.2);
+      padding:22px;box-shadow:0 12px 30px rgba(0,0,0,.3);
+      transition:all .3s ease;
+    }
+    .glass:hover{transform:translateY(-5px);box-shadow:0 20px 40px rgba(0,217,255,.3);}
+
+    .form-control,
+    .form-control::placeholder {
+      color: #fff !important;
+      opacity: 1;
+    }
+    .form-control {
+      background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);
+      border-radius:12px;padding:11px;
+    }
+    .form-control:focus{
+      background:rgba(255,255,255,.2);border-color:var(--primary);
+      box-shadow:0 0 0 .2rem rgba(0,217,255,.3);
+    }
+
+    .btn-neon{
+      background:linear-gradient(45deg,#00d9ff,#ff00c8);
+      border:none;border-radius:50px;padding:11px 26px;
+      font-weight:600;color:#fff;box-shadow:0 0 18px rgba(0,217,255,.5);
+      transition:all .3s;
+    }
+    .btn-neon:hover{transform:translateY(-3px);box-shadow:0 0 28px rgba(0,217,255,.8);}
+    .btn-neon:disabled{opacity:.6;cursor:not-allowed;transform:none;}
+
+    #map{height:500px;border-radius:18px;overflow:hidden;box-shadow:0 18px 38px rgba(0,0,0,.4);}
+    
+    .stats-card{
+      background:var(--glass);border-radius:16px;padding:18px;text-align:center;
+    }
+
+    .legend{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:16px 0;}
+    .legend-item{display:flex;align-items:center;gap:6px;font-size:.85rem;}
+    .legend-color{width:13px;height:13px;border-radius:50%;}
+
+    .search-box{position:absolute;top:15px;right:15px;z-index:1000;width:280px;}
+    .search-wrapper {
+      position: relative;
+    }
+    .search-wrapper input {
+      padding-left: 40px !important;
+      width: 100%;
+    }
+    .search-wrapper i {
+      position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+      color: #aaa; font-size: 1.1rem;
+    }
+
+    .data-list{max-height:480px;overflow-y:auto;padding-right:8px;}
+    .data-item{
+      background:rgba(255,255,255,.08);border-radius:12px;padding:12px;
+      margin-bottom:10px;border-left:4px solid var(--primary);
+      font-size:0.9rem;
+    }
+    .data-item b{font-weight:700 !important;}
+    .recent-report{font-size:0.9rem;line-height:1.4;}
+    .recent-report b{font-weight:700;color:#fff;}
+    .view-more-btn{margin-top:10px;}
+    .toast{position:fixed;bottom:20px;right:20px;z-index:2000;max-width:320px;}
+
+    @media(max-width:992px){
+      .search-box{position:static;width:100%;margin:15px 0;}
+      #map{height:380px;}
+    }
+    @media(max-width:768px){
+      .header h1{font-size:2.5rem;}
+      .header-logo{width:60px;height:60px;}
+      .logo-container{gap:15px;}
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo-container">
+      <img src="logo.png" alt="VāyuLog Logo" class="header-logo">
+      <h1>VāyuLog</h1>
+    </div>
+    <p>Real-time Air Quality by Citizens</p>
+  </div>
+
+  <div class="container-fluid px-4">
+
+    <!-- Search -->
+    <div class="search-box">
+      <div class="search-wrapper">
+        <i class="fas fa-search"></i>
+        <input type="text" class="form-control" placeholder="Search city..." id="searchCity">
+      </div>
+    </div>
+
+    <!-- Stats + Recent Reports -->
+    <div class="row mb-4 g-3">
+      <div class="col-md-3 col-6">
+        <div class="stats-card glass">
+          <h6>Total Reports</h6>
+          <h3 id="totalReports">0</h3>
+        </div>
+      </div>
+
+      <div class="col-md-6 col-12">
+        <div class="stats-card glass">
+          <h6>Latest Reports</h6>
+          <div id="recentReports">
+            <p class="text-center text-muted mb-0">No reports yet...</p>
+          </div>
+          <button class="btn btn-neon w-100 mt-3 view-more-btn d-none" id="viewMoreBtn" onclick="showFullList()">
+            View More
+          </button>
+        </div>
+      </div>
+
+      <div class="col-md-3 col-6">
+        <div class="stats-card glass d-grid">
+          <button class="btn btn-neon" onclick="shareApp()">Share App</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-4">
+        <div class="glass">
+          <h4 class="text-center mb-4">Report AQI</h4>
+          <form id="aqiForm" novalidate>
+            <div class="mb-3">
+              <input type="text" class="form-control" id="name" placeholder="Your Name" required>
+            </div>
+            <div class="row">
+              <div class="col-6 mb-3">
+                <input type="number" class="form-control" id="aqi" placeholder="AQI" min="0" max="500" required>
+              </div>
+              <div class="col-6 mb-3">
+                <input type="number" class="form-control" id="pm25" placeholder="PM2.5" required>
+              </div>
+            </div>
+            <div class="mb-3">
+              <input type="number" class="form-control" id="pm10" placeholder="PM10" required>
+            </div>
+            <div class="mb-3">
+              <input type="text" class="form-control" id="address" placeholder="Enter city manually or use location" required>
+              <button type="button" class="btn btn-outline-light w-100 mt-2" id="getLocation">
+                Use My Location
+              </button>
+            </div>
+            <button type="submit" class="btn btn-neon w-100" id="submitBtn">
+              <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+              Submit Report
+            </button>
+          </form>
+          <div id="message" class="mt-3 text-center"></div>
+        </div>
+
+        <div class="glass mt-4 d-none" id="fullListPanel">
+          <h5 class="text-center mb-3">All Reports</h5>
+          <div class="data-list" id="dataList">
+            <p class="text-center text-muted">No reports yet...</p>
+          </div>
+          <button class="btn btn-outline-light w-100 mt-3" onclick="hideFullList()">Back</button>
+        </div>
+      </div>
+
+      <div class="col-lg-8">
+        <div class="glass p-3">
+          <h4 class="text-center mb-3">Live Pollution Map</h4>
+          <div class="legend">
+            <div class="legend-item"><div class="legend-color" style="background:#34c759;"></div> Good (0-50)</div>
+            <div class="legend-item"><div class="legend-color" style="background:#ffcc00;"></div> Moderate (51-100)</div>
+            <div class="legend-item"><div class="legend-color" style="background:#ff9500;"></div> Unhealthy (101-200)</div>
+            <div class="legend-item"><div class="legend-color" style="background:#ff3b30;"></div> Hazardous (201+)</div>
+          </div>
+          <div id="map"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast align-items-center text-white bg-success border-0" role="alert" id="toast">
+    <div class="d-flex">
+      <div class="toast-body"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // ===== SECURE VERSION - NO API KEY NEEDED =====
+    const API_URL = 'https://script.google.com/macros/s/AKfycbydNIWnbcfazOJkVJhjNYS0XGVWEs-Lg66cjKJbJTlLhb041t4nCqhXNz4-fY6ZRZQU/exec';
+    let map, markers = L.layerGroup();
+    let toast;
+    let lastRequestTime = 0;
+
+    async function rateLimitedFetch(url, options) {
+      const now = Date.now();
+      const timeSinceLastRequest = now - lastRequestTime;
+      if (timeSinceLastRequest < 1000) {
+        await new Promise(resolve => setTimeout(resolve, 1000 - timeSinceLastRequest));
+      }
+      lastRequestTime = Date.now();
+      return fetch(url, options);
+    }
+
+    window.onload = () => {
+      initMap();
+      loadData();
+      toast = new bootstrap.Toast(document.getElementById('toast'));
+      document.getElementById('aqiForm').addEventListener('submit', submitReport);
+      document.getElementById('getLocation').addEventListener('click', getLiveLocation);
+
+      const searchInput = document.getElementById('searchCity');
+      searchInput.addEventListener('keypress', e => e.key === 'Enter' && searchCity());
+      searchInput.addEventListener('blur', () => {
+        if (searchInput.value.trim()) searchCity();
+      });
+    };
+
+    function initMap() {
+      map = L.map('map').setView([20.5937, 78.9629], 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+      markers.addTo(map);
+    }
+
+    async function loadData() {
+      try {
+        const res = await fetch(API_URL);
+        const { data } = await res.json();
+        markers.clearLayers();
+        const recentDiv = document.getElementById('recentReports');
+        const fullList = document.getElementById('dataList');
+        recentDiv.innerHTML = '';
+        fullList.innerHTML = '';
+
+        let count = 0;
+        const latestThree = data.slice().reverse().slice(0, 3);
+
+        data.slice().reverse().forEach(p => {
+          if (p.lat && p.lng && p.aqi) {
+            const item = document.createElement('div');
+            item.className = 'data-item';
+            item.innerHTML = `
+              <div><b>${p.name}</b> • <b>${p.city}</b></div>
+              <div>AQI: <b style="color:${getColor(p.aqi)}">${p.aqi}</b> | PM2.5: <b>${p.pm25}</b> | PM10: <b>${p.pm10}</b></div>
+              <small class="text-muted">${new Date(p.timestamp).toLocaleString()}</small>
+            `;
+            fullList.appendChild(item);
+
+            const marker = L.circleMarker([p.lat, p.lng], {
+              radius: 12,
+              fillColor: getColor(p.aqi),
+              color: '#000',
+              weight: 2,
+              fillOpacity: 0.9
+            }).addTo(markers);
+            marker.bindPopup(`
+              <b>${p.city || 'Unknown'}</b><br>
+              <b>${p.name}</b><br>
+              AQI: <b>${p.aqi}</b> | PM2.5: ${p.pm25} | PM10: ${p.pm10}
+            `);
+            count++;
+          }
+        });
+
+        if (latestThree.length === 0) {
+          recentDiv.innerHTML = '<p class="text-center text-muted mb-0">No reports yet...</p>';
+        } else {
+          latestThree.forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'recent-report mb-2';
+            div.innerHTML = `
+              <div><b>${p.name}</b> • <b>${p.city}</b></div>
+              <div>AQI: <b style="color:${getColor(p.aqi)}">${p.aqi}</b> | PM2.5: <b>${p.pm25}</b></div>
+            `;
+            recentDiv.appendChild(div);
+          });
+          if (data.length > 3) {
+            document.getElementById('viewMoreBtn').classList.remove('d-none');
+          }
+        }
+
+        document.getElementById('totalReports').textContent = count;
+      } catch (err) {
+        console.error("Load error:", err);
+      }
+    }
+
+    function getColor(aqi) {
+      aqi = parseInt(aqi);
+      if (aqi <= 50) return '#34c759';
+      if (aqi <= 100) return '#ffcc00';
+      if (aqi <= 200) return '#ff9500';
+      return '#ff3b30';
+    }
+
+    function showToast(msg, type = 'success') {
+      const t = document.getElementById('toast');
+      t.className = `toast align-items-center text-white bg-${type} border-0`;
+      t.querySelector('.toast-body').textContent = msg;
+      toast.show();
+    }
+
+    function showFullList() {
+      document.querySelector('.col-lg-4 > .glass').classList.add('d-none');
+      document.getElementById('fullListPanel').classList.remove('d-none');
+    }
+
+    function hideFullList() {
+      document.getElementById('fullListPanel').classList.add('d-none');
+      document.querySelector('.col-lg-4 > .glass').classList.remove('d-none');
+    }
+
+    function getLiveLocation() {
+      const btn = document.getElementById('getLocation');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Detecting...';
+
+      if (!navigator.geolocation) {
+        showToast("Geolocation not supported!", "danger");
+        btn.disabled = false;
+        btn.innerHTML = 'Use My Location';
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(async pos => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          const res = await rateLimitedFetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1&zoom=18`,
+            { headers: { 'User-Agent': 'VayuLog/1.0' } }
+          );
+          const data = await res.json();
+          const addr = data.address;
+          
+          const houseNumber = addr?.house_number || '';
+          const road = addr?.road || addr?.street || '';
+          const neighbourhood = addr?.neighbourhood || '';
+          const suburb = addr?.suburb || '';
+          const city = addr?.city || addr?.town || addr?.village || 'Unknown';
+          const postcode = addr?.postcode || '';
+          
+          let addressParts = [];
+          
+          if (houseNumber && road) {
+            addressParts.push(`${houseNumber} ${road}`);
+          } else if (road) {
+            addressParts.push(road);
+          }
+          
+          if (neighbourhood) addressParts.push(neighbourhood);
+          if (suburb && suburb !== neighbourhood) addressParts.push(suburb);
+          if (city) addressParts.push(city);
+          if (postcode) addressParts.push(postcode);
+          
+          const detailedLocation = addressParts
+            .filter((part, index, self) => part && self.indexOf(part) === index)
+            .join(', ');
+          
+          document.getElementById('address').value = detailedLocation || 'Location detected';
+          map.setView([latitude, longitude], 16);
+          showToast(`Exact location: ${detailedLocation}`, "success");
+          
+          console.log('Full address data:', addr);
+        } catch (err) {
+          console.error('Geocoding error:', err);
+          document.getElementById('address').value = `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`;
+          showToast("Location captured with coordinates!", "success");
+        }
+        btn.disabled = false;
+        btn.innerHTML = 'Use My Location';
+      }, () => {
+        showToast("Location access denied!", "danger");
+        btn.disabled = false;
+        btn.innerHTML = 'Use My Location';
+      }, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      });
+    }
+
+    async function submitReport(e) {
+      e.preventDefault();
+      const form = e.target;
+      const submitBtn = document.getElementById('submitBtn');
+      const spinner = submitBtn.querySelector('.spinner-border');
+
+      if (!form.checkValidity()) return form.reportValidity();
+
+      submitBtn.disabled = true;
+      spinner.classList.remove('d-none');
+
+      let lat, lng;
+      const addr = document.getElementById('address').value;
+
+      if (addr.includes('Lat')) {
+        [lat, lng] = addr.match(/-?\d+\.\d+/g).map(Number);
+      } else {
+        try {
+          const res = await rateLimitedFetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&countrycodes=in&limit=1`,
+            { headers: { 'User-Agent': 'VayuLog/1.0' } }
+          );
+          const data = await res.json();
+          if (data && data[0]) {
+            lat = parseFloat(data[0].lat);
+            lng = parseFloat(data[0].lon);
+          }
+        } catch (err) {
+          console.error('Geocoding error:', err);
+        }
+      }
+
+      if (!lat || !lng) {
+        showToast("Invalid location! Please check city name.", "danger");
+        submitBtn.disabled = false;
+        spinner.classList.add('d-none');
+        return;
+      }
+
+      const payload = {
+        name: document.getElementById('name').value,
+        aqi: document.getElementById('aqi').value,
+        pm25: document.getElementById('pm25').value,
+        pm10: document.getElementById('pm10').value,
+        city: addr.split(',')[0].trim(),
+        lat, lng,
+        timestamp: new Date().toISOString()
+      };
+
+      try {
+        await fetch(API_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        showToast("Report submitted! Refreshing...", "success");
+        form.reset();
+        setTimeout(() => loadData(), 2000);
+      } catch {
+        showToast("Submit failed. Try again.", "danger");
+      } finally {
+        submitBtn.disabled = false;
+        spinner.classList.add('d-none');
+      }
+    }
+
+    function searchCity() {
+      const q = document.getElementById('searchCity').value.trim();
+      if (!q) return;
+
+      rateLimitedFetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=in&limit=1`,
+        { headers: { 'User-Agent': 'VayuLog/1.0' } }
+      )
+        .then(r => r.json())
+        .then(d => {
+          if (d && d[0]) {
+            const lat = parseFloat(d[0].lat);
+            const lon = parseFloat(d[0].lon);
+            map.setView([lat, lon], 12);
+            showToast(`Zoomed to: ${q}`, "success");
+          } else {
+            showToast("City not found!", "warning");
+          }
+        })
+        .catch(() => showToast("Search failed!", "danger"));
+    }
+
+    function shareApp() {
+      const url = window.location.href;
+      if (navigator.share) {
+        navigator.share({ title: "VāyuLog - Real-time Air Quality", url });
+      } else {
+        navigator.clipboard.writeText(url);
+        showToast("Link copied!", "success");
+      }
+    }
+
+    setInterval(loadData, 15000);
+  </script>
+  <footer style="text-align:center; padding:20px; font-size:0.85rem; color:rgba(255,255,255,0.6);">
+  <p>Geocoding by <a href="https://nominatim.openstreetmap.org" target="_blank" style="color:#00d9ff;">Nominatim</a> | Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" style="color:#00d9ff;">OpenStreetMap contributors</a></p>
+</footer>
+
+</body>
+</html>
